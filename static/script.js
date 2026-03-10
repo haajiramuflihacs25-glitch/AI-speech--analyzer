@@ -396,6 +396,9 @@ function setupAIComponents() {
     const sendBtn = document.getElementById('sendMessageBtn');
     const userInput = document.getElementById('userMessageInput');
     
+    // Show AI icon by default (always available for chat)
+    aiIcon.classList.remove('hidden');
+    
     // AI icon click event
     aiIcon.addEventListener('click', toggleAIPanel);
     
@@ -419,16 +422,18 @@ function setupAIComponents() {
     });
 }
 
-// Show floating AI icon after analysis
+// Show analysis notification on floating AI icon
 function showFloatingAIIcon(analysisResults) {
     currentAnalysisResults = analysisResults;
     const aiIcon = document.getElementById('aiFloatingIcon');
     
-    // Show and animate icon
-    aiIcon.classList.remove('hidden');
+    // Add blinking animation to indicate new analysis is ready
+    aiIcon.classList.add('blinking');
+    
+    // Remove blinking after a few seconds
     setTimeout(() => {
-        aiIcon.classList.add('blinking');
-    }, 500);
+        aiIcon.classList.remove('blinking');
+    }, 10000); // Blink for 10 seconds to get user's attention
     
     // Generate initial AI insights
     generateInitialInsights(analysisResults);
@@ -523,6 +528,20 @@ function openAIPanel() {
     
     // Load existing chat history
     displayChatHistory();
+    
+    // Show welcome message if no chat history exists
+    if (aiChatHistory.length === 0) {
+        const welcomeMessage = currentAnalysisResults ? 
+            "👋 Hi! I've analyzed your speech and I'm ready to discuss the results. You can also ask me anything else you'd like to know!" :
+            "👋 Hello! I'm your AI assistant. I can help with speech analysis, communication tips, or answer any questions you have. Feel free to ask me anything!";
+            
+        addMessageToChat('ai', welcomeMessage, false);
+        aiChatHistory.push({
+            type: 'ai',
+            content: welcomeMessage,
+            timestamp: new Date()
+        });
+    }
     
     // Focus on input
     setTimeout(() => {
