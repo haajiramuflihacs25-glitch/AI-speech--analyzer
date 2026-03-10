@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Speech Analyzer</title>
+    <link rel="stylesheet" href="static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/recordrtc@5.6.2/RecordRTC.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-microphone-alt"></i> AI Speech Analyzer</h1>
+            <p>Advanced speech transcription, sentiment analysis, and AI-powered insights</p>
+            <div class="ai-badge">
+                <i class="fas fa-robot"></i> Powered by OpenRouter AI & Whisper
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- File Upload Section -->
+            <section class="upload-section">
+                <div class="upload-methods">
+                    <!-- File Upload -->
+                    <div class="upload-method active" id="uploadMethod">
+                        <div class="method-header">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <h4>Upload File</h4>
+                        </div>
+                        <div class="upload-area" id="uploadArea">
+                            <p>Drag & drop or click to select</p>
+                            <input type="file" id="audioFile" accept=".wav,.mp3,.m4a,.mp4,.mov,.avi,.mkv,.wmv,.flv,.webm,.ogg" hidden>
+                            <button class="btn btn-primary btn-sm" onclick="document.getElementById('audioFile').click()">
+                                <i class="fas fa-folder-open"></i> Browse
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Microphone Recording -->
+                    <div class="upload-method" id="recordMethod">
+                        <div class="method-header">
+                            <i class="fas fa-microphone"></i>
+                            <h4>Record Audio</h4>
+                        </div>
+                        <div class="recording-area">
+                            <button class="btn btn-record btn-sm" id="recordBtn" onclick="toggleRecording()">
+                                <i class="fas fa-microphone"></i> Record
+                            </button>
+                            <div class="recording-status" id="recordingStatus" style="display: none;">
+                                <div class="recording-indicator">
+                                    <div class="pulse"></div>
+                                    <span id="recordingTime">00:00</span>
+                                </div>
+                                <button class="btn btn-stop btn-sm" onclick="stopRecording()">
+                                    <i class="fas fa-stop"></i>
+                                </button>
+                            </div>
+                            <div class="recording-preview" id="recordingPreview" style="display: none;">
+                                <audio controls id="recordedAudio"></audio>
+                                <div class="recording-actions">
+                                    <button class="btn btn-success btn-sm" onclick="useRecording()">
+                                        <i class="fas fa-check"></i> Use
+                                    </button>
+                                    <button class="btn btn-secondary btn-sm" onclick="discardRecording()">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Method Toggle -->
+                <div class="method-toggle">
+                    <button class="toggle-btn active" onclick="switchMethod('upload')">
+                        <i class="fas fa-upload"></i> Upload
+                    </button>
+                    <button class="toggle-btn" onclick="switchMethod('record')">
+                        <i class="fas fa-microphone"></i> Record
+                    </button>
+                </div>
+                
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <i class="fas fa-file-audio"></i>
+                    <span id="fileName"></span>
+                    <span id="fileSize"></span>
+                </div>
+
+                <button class="btn btn-success" id="analyzeBtn" onclick="analyzeAudio()" disabled>
+                    <i class="fas fa-play"></i> Analyze Speech
+                </button>
+            </section>
+
+            <!-- Loading Section -->
+            <section class="loading-section" id="loadingSection" style="display: none;">
+                <div class="spinner"></div>
+                <p>Analyzing your audio file...</p>
+                <div class="progress-bar">
+                    <div class="progress" id="progressBar"></div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <h2><i class="fas fa-chart-line"></i> Analysis Results</h2>
+                
+                <!-- Transcription Results -->
+                <div class="result-card">
+                    <h3><i class="fas fa-file-alt"></i> Transcription</h3>
+                    <div class="transcription-text" id="transcriptionText"></div>
+                    <button class="btn btn-secondary" onclick="copyTranscription()">
+                        <i class="fas fa-copy"></i> Copy Text
+                    </button>
+                </div>
+
+                <!-- Sentiment Analysis -->
+                <div class="result-card">
+                    <h3><i class="fas fa-heart"></i> Sentiment Analysis</h3>
+                    <div class="sentiment-container">
+                        <div class="sentiment-score">
+                            <span class="label">Polarity Score:</span>
+                            <span class="score" id="polarityScore"></span>
+                        </div>
+                        <div class="sentiment-result">
+                            <span class="label">Overall Sentiment:</span>
+                            <span class="sentiment" id="sentimentResult"></span>
+                        </div>
+                        <div class="sentiment-bar">
+                            <div class="bar-fill" id="sentimentBar"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Word Frequency Analysis -->
+                <div class="result-card">
+                    <h3><i class="fas fa-chart-bar"></i> Word Frequency Analysis</h3>
+                    <div class="chart-container">
+                        <canvas id="wordChart"></canvas>
+                    </div>
+                    <div class="word-stats" id="wordStats"></div>
+                </div>
+
+                <!-- AI Analysis removed - now handled by floating icon -->
+                    <!-- Additional Statistics -->
+                <div class="result-card">
+                    <h3><i class="fas fa-info-circle"></i> Speech Statistics</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Words:</span>
+                            <span class="stat-value" id="totalWords">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Unique Words:</span>
+                            <span class="stat-value" id="uniqueWords">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Average Word Length:</span>
+                            <span class="stat-value" id="avgWordLength">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Speech Duration:</span>
+                            <span class="stat-value" id="speechDuration">-</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- History Section -->
+            <section class="history-section">
+                <h2><i class="fas fa-history"></i> Analysis History</h2>
+                <div class="history-list" id="historyList">
+                    <p class="no-history">No analysis history yet. Upload and analyze your first audio file!</p>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2026 AI Speech Analyzer. Powered by Whisper AI and TextBlob.</p>
+        </footer>
+    </div>
+
+    <!-- Floating AI Assistant Icon -->
+    <div id="aiFloatingIcon" class="ai-floating-icon hidden">
+        <i class="fas fa-robot"></i>
+        <div class="ai-notification-dot"></div>
+    </div>
+
+    <!-- AI Assistant Side Panel -->
+    <div id="aiSidePanel" class="ai-side-panel">
+        <div class="ai-panel-header">
+            <h3><i class="fas fa-robot"></i> AI Assistant</h3>
+            <button id="closePanelBtn" class="close-panel-btn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="ai-chat-container">
+            <div id="aiChatMessages" class="ai-chat-messages">
+                <div class="ai-message">
+                    <div class="ai-avatar">🤖</div>
+                    <div class="message-content">
+                        <p>Hello! I've analyzed your audio. Click below to see my insights or ask me any questions!</p>
+                    </div>
+                </div>
+            </div>
+            <div class="ai-loading" id="aiLoading" style="display: none;">
+                <div class="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <p>AI is thinking...</p>
+            </div>
+            <div class="ai-chat-input">
+                <input type="text" id="userMessageInput" placeholder="Ask me about your speech analysis..." maxlength="500">
+                <button id="sendMessageBtn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="static/script.js"></script>
+</body>
+</html>
