@@ -344,10 +344,12 @@ def generate_speech_analysis(analysis_data):
 def generate_AI_response(message, analysis_data, chat_history):
     """Generate AI response based on user message and context"""
     try:
+        print(f"DEBUG: Processing user message: '{message}'")
         # If OpenRouter API is available, use it
         if OPENROUTER_API_KEY:
             return generate_openrouter_response(message, analysis_data, chat_history)
         else:
+            print("DEBUG: Using fallback response system")
             return generate_fallback_response(message, analysis_data)
     except Exception as e:
         print(f"Error generating AI response: {e}")
@@ -435,13 +437,25 @@ Guidelines:
 def generate_fallback_response(message, analysis_data):
     """Generate comprehensive local fallback response for any type of question"""
     message_lower = message.lower().strip()
+    print(f"DEBUG: Fallback processing message: '{message_lower}'")
     
     # Greeting responses
     if any(word in message_lower for word in ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening']):
         return "Hello! 👋 I'm your AI speech analysis assistant. I can help you with speech analysis, communication tips, or answer any questions you have. What would you like to discuss today?"
     
-    # Speech analysis related questions  
-    elif any(word in message_lower for word in ['sentiment', 'emotion', 'tone', 'feeling', 'speech', 'voice', 'analysis']):
+    # PRIORITIZE: Speech improvement questions (must come before general speech analysis)
+    elif any(combo in message_lower for combo in ['improve in my speech', 'improve my speech', 'speech improvement', 'suggestion which i want to improve', 'things i want to improve']):
+        print("DEBUG: Routing to speech improvement (personal_development)")
+        return handle_personal_development(message_lower)
+    
+    # Personal development & life advice (general improvement questions)
+    elif any(word in message_lower for word in ['improve', 'better', 'tips', 'advice', 'help', 'motivation', 'confidence', 'goal', 'habit', 'success']) and not any(word in message_lower for word in ['sentiment', 'analysis']):
+        print("DEBUG: Routing to handle_personal_development")
+        return handle_personal_development(message_lower)
+    
+    # Speech analysis related questions (for actual analysis discussion)
+    elif any(word in message_lower for word in ['sentiment', 'emotion', 'tone', 'feeling', 'analysis']) or (any(word in message_lower for word in ['speech', 'voice']) and not any(word in message_lower for word in ['improve', 'better', 'tips', 'suggestion'])):
+        print("DEBUG: Routing to handle_speech_questions")
         return handle_speech_questions(message_lower, analysis_data)
     
     # Technology & AI questions
@@ -467,10 +481,6 @@ def generate_fallback_response(message, analysis_data):
     # Science & general knowledge
     elif any(word in message_lower for word in ['science', 'physics', 'chemistry', 'biology', 'math', 'history', 'geography', 'space', 'astronomy']):
         return handle_science_questions(message_lower)
-    
-    # Personal development & life advice
-    elif any(word in message_lower for word in ['improve', 'better', 'tips', 'advice', 'help', 'motivation', 'confidence', 'goal', 'habit', 'success']):
-        return handle_personal_development(message_lower)
     
     # Entertainment & hobbies
     elif any(word in message_lower for word in ['movie', 'music', 'book', 'game', 'hobby', 'travel', 'food', 'recipe', 'entertainment']):
@@ -538,10 +548,21 @@ def handle_science_questions(message_lower):
 
 def handle_personal_development(message_lower):
     """Handle personal development questions"""
-    if 'confidence' in message_lower:
+    # Speech improvement questions
+    if any(word in message_lower for word in ['speech', 'speaking', 'communication', 'presentation', 'voice', 'delivery']):
+        if 'improve' in message_lower or 'better' in message_lower:
+            return "**🎯 Great question! Here are key areas to improve your speech:**\n\n**📢 Delivery & Voice:**\n• **Pace**: Vary your speaking speed - slow down for important points\n• **Volume**: Project your voice clearly without shouting\n• **Tone**: Match your tone to your content (enthusiastic, serious, etc.)\n• **Pauses**: Use strategic silence to let key points sink in\n\n**💬 Content & Structure:**\n• **Clarity**: Use simple, direct language your audience understands\n• **Organization**: Start with main points, support with examples\n• **Transitions**: Connect ideas smoothly with linking phrases\n• **Engagement**: Ask questions, use stories, involve your audience\n\n**🧠 Confidence & Presence:**\n• **Body language**: Stand tall, make eye contact, use gestures\n• **Preparation**: Know your material inside and out\n• **Practice**: Rehearse out loud, record yourself\n• **Mindset**: Focus on your message, not your nerves\n\nWhat specific aspect would you like to work on most?"
+        else:
+            return "I can help you improve various aspects of your speech! Are you looking to work on delivery, content organization, confidence, voice projection, or something specific? Let me know what area interests you most!"
+    # Confidence questions
+    elif 'confidence' in message_lower:
         return "Building confidence in communication takes practice! Start with small conversations, prepare talking points for social situations, practice good posture, and remember that most people are focused on themselves, not judging you. Each successful interaction builds more confidence."
+    # Motivation questions
     elif 'motivation' in message_lower:
         return "Staying motivated requires clear goals and celebrating small wins. Set specific, achievable targets for your communication skills - like speaking up once in each meeting, or giving one genuine compliment daily. Track your progress and acknowledge improvements!"
+    # General improvement questions
+    elif 'improve' in message_lower or 'better' in message_lower:
+        return "**🌟 Here are proven ways to improve yourself:**\n\n**🎯 Set Clear Goals:**\n• Define specific, measurable objectives\n• Break big goals into smaller, actionable steps\n• Track your progress regularly\n\n**💪 Build Good Habits:**\n• Start with one small change at a time\n• Be consistent - even 10 minutes daily helps\n• Focus on progress, not perfection\n\n**📚 Keep Learning:**\n• Read books, take courses, watch tutorials\n• Learn from others who excel in areas you want to improve\n• Practice new skills regularly\n\n**🤝 Communication Skills:**\n• Listen actively to others\n• Practice speaking clearly and confidently\n• Work on body language and presence\n\nWhat specific area would you like to focus on improving?"
     else:
         return "Personal growth often comes through better communication. Whether building relationships, advancing careers, or gaining confidence, how we express ourselves shapes our experiences. What area of personal development interests you most?"
 
