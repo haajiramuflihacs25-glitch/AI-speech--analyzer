@@ -10,28 +10,15 @@
     <script src="https://cdn.jsdelivr.net/npm/recordrtc@5.6.2/RecordRTC.min.js"></script>
 </head>
 <body>
-    <!-- Thin Fixed Navbar -->
-    <nav class="navbar">
-        <div class="navbar-inner">
-            <div class="navbar-brand">
-                <i class="fas fa-microphone-alt"></i> AI Speech Analyzer
-            </div>
-            <div class="navbar-links">
-                <a href="#resultsSection">Results</a>
-                <a href="#historyList">History</a>
-            </div>
-        </div>
-    </nav>
-
-    <header class="header">
-        <h1><i class="fas fa-microphone-alt"></i> AI Speech Analyzer</h1>
-        <p>Advanced speech transcription, sentiment analysis, and AI-powered insights</p>
-        <div class="ai-badge">
-            <i class="fas fa-robot"></i> Powered by Whisper AI &amp; OpenRouter
-        </div>
-    </header>
-
     <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-microphone-alt"></i> AI Speech Analyzer</h1>
+            <p>Advanced speech transcription, sentiment analysis, and AI-powered insights</p>
+            <div class="ai-badge">
+                <i class="fas fa-robot"></i> Powered by OpenRouter AI & Whisper
+            </div>
+        </header>
+
         <main class="main-content">
             <!-- File Upload Section -->
             <section class="upload-section">
@@ -109,7 +96,7 @@
             <!-- Loading Section -->
             <section class="loading-section" id="loadingSection" style="display: none;">
                 <div class="spinner"></div>
-                <p>Analyzing your audio...</p>
+                <p>Analyzing your audio file...</p>
                 <div class="progress-bar">
                     <div class="progress" id="progressBar"></div>
                 </div>
@@ -123,48 +110,109 @@
                 <div class="result-card">
                     <h3><i class="fas fa-file-alt"></i> Transcription</h3>
                     <div class="transcription-text" id="transcriptionText"></div>
-                    <button class="btn btn-secondary btn-sm" onclick="copyTranscription()">
+                    <button class="btn btn-secondary" onclick="copyTranscription()">
                         <i class="fas fa-copy"></i> Copy Text
                     </button>
                 </div>
 
-                <!-- Filler Word Analysis -->
-                <div class="result-card">
-                    <h3><i class="fas fa-exclamation-triangle"></i> Filler Word Analysis</h3>
-                    <div class="filler-analysis-container">
-                        <div class="filler-stats-grid">
-                            <div class="filler-stat-item">
-                                <span class="filler-stat-label">Filler Count</span>
-                                <span class="filler-stat-value" id="fillerCount">0</span>
+                <!-- Filler Words Analysis -->
+                <div class="result-card" id="fillerWordsCard">
+                    <h3><i class="fas fa-search"></i> Filler Words Analysis</h3>
+                    <div class="filler-analysis">
+                        <h4><i class="fas fa-exclamation-triangle"></i> Speech Clarity Assessment</h4>
+                        <div class="filler-stats">
+                            <div class="filler-stat">
+                                <span class="stat-label">Filler Words Found:</span>
+                                <span class="stat-value" id="fillerCount">0</span>
                             </div>
-                            <div class="filler-stat-item">
-                                <span class="filler-stat-label">Percentage</span>
-                                <span class="filler-stat-value" id="fillerPercentage">0%</span>
+                            <div class="filler-stat">
+                                <span class="stat-label">Filler Percentage:</span>
+                                <span class="stat-value" id="fillerPercentage">0%</span>
                             </div>
-                            <div class="filler-stat-item">
-                                <span class="filler-stat-label">Rate / Min</span>
-                                <span class="filler-stat-value" id="fillerRate">0</span>
+                            <div class="filler-stat">
+                                <span class="stat-label">Fillers Per Minute:</span>
+                                <span class="stat-value" id="fillerRate">0</span>
                             </div>
                         </div>
                         
-                        <div class="filler-progress-container">
-                            <div class="filler-progress-bar">
-                                <div class="filler-progress-fill" id="fillerProgressFill"></div>
+                        <div class="filler-words-list">
+                            <h5>Detected Filler Words:</h5>
+                            <div class="filler-tags" id="fillerTags">
+                                <!-- Filler word tags will be populated here -->
                             </div>
-                            <div class="filler-level" id="fillerLevel">Excellent</div>
                         </div>
 
-                        <div class="filler-breakdown" id="fillerBreakdown">
-                            <h4>Most Common Fillers</h4>
-                            <div class="filler-words-list" id="fillerWordsList"></div>
+                        <div class="filler-recommendations">
+                            <h5><i class="fas fa-lightbulb"></i> Improvement Tips:</h5>
+                            <ul id="fillerRecommendations">
+                                <!-- Recommendations will be added dynamically -->
+                            </ul>
                         </div>
 
-                        <div class="filler-recommendations" id="fillerRecommendations">
-                            <h4>Recommendations</h4>
-                            <div id="fillerTips"></div>
+                        <div style="margin-top: 20px;">
+                            <h5><i class="fas fa-highlighter"></i> Highlighted Transcription:</h5>
+                            <div class="transcription-text" id="highlightedTranscription"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Speech Score Analysis -->
+                <div class="result-card" id="speechScoreCard">
+                    <h3><i class="fas fa-trophy"></i> Speech Score Analysis</h3>
+                    <div class="speech-score-container">
+                        <!-- Overall Score Display -->
+                        <div class="score-display">
+                            <div class="score-circle">
+                                <div class="score-number" id="overallScore">0</div>
+                                <div class="score-label">Overall Score</div>
+                            </div>
+                            <div class="speaker-level">
+                                <span class="level-emoji" id="levelEmoji">🎯</span>
+                                <span class="level-text" id="speakerLevel">Analyzing...</span>
+                            </div>
                         </div>
 
-                        <div class="filler-highlighted-transcription" id="fillerHighlightedText"></div>
+                        <!-- Score Breakdown -->
+                        <div class="score-breakdown">
+                            <h4><i class="fas fa-chart-pie"></i> Score Breakdown</h4>
+                            <div class="breakdown-items">
+                                <div class="breakdown-item positive">
+                                    <span class="breakdown-label">Base Score:</span>
+                                    <span class="breakdown-value" id="baseScore">100</span>
+                                </div>
+                                <div class="breakdown-item negative">
+                                    <span class="breakdown-label">Filler Word Penalty:</span>
+                                    <span class="breakdown-value" id="fillerPenalty">-0</span>
+                                </div>
+                                <div class="breakdown-item positive">
+                                    <span class="breakdown-label">Sentiment Bonus:</span>
+                                    <span class="breakdown-value" id="sentimentBonus">+0</span>
+                                </div>
+                                <div class="breakdown-item positive">
+                                    <span class="breakdown-label">Vocabulary Bonus:</span>
+                                    <span class="breakdown-value" id="vocabBonus">+0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Additional Metrics -->
+                        <div class="additional-metrics">
+                            <div class="metric-item">
+                                <span class="metric-label">Vocabulary Diversity:</span>
+                                <span class="metric-value" id="vocabDiversity">0%</span>
+                                <div class="metric-bar">
+                                    <div class="metric-progress" id="vocabProgress"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Feedback Section -->
+                        <div class="feedback-section">
+                            <h4><i class="fas fa-comments"></i> Personalized Feedback</h4>
+                            <div class="feedback-list" id="speechFeedback">
+                                <!-- Feedback messages will be populated here -->
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -173,11 +221,11 @@
                     <h3><i class="fas fa-heart"></i> Sentiment Analysis</h3>
                     <div class="sentiment-container">
                         <div class="sentiment-score">
-                            <span class="label">Polarity Score</span>
+                            <span class="label">Polarity Score:</span>
                             <span class="score" id="polarityScore"></span>
                         </div>
                         <div class="sentiment-result">
-                            <span class="label">Overall Sentiment</span>
+                            <span class="label">Overall Sentiment:</span>
                             <span class="sentiment" id="sentimentResult"></span>
                         </div>
                         <div class="sentiment-bar">
@@ -188,32 +236,33 @@
 
                 <!-- Word Frequency Analysis -->
                 <div class="result-card">
-                    <h3><i class="fas fa-chart-bar"></i> Word Frequency</h3>
+                    <h3><i class="fas fa-chart-bar"></i> Word Frequency Analysis</h3>
                     <div class="chart-container">
                         <canvas id="wordChart"></canvas>
                     </div>
                     <div class="word-stats" id="wordStats"></div>
                 </div>
 
-                <!-- Speech Statistics -->
+                <!-- AI Analysis removed - now handled by floating icon -->
+                    <!-- Additional Statistics -->
                 <div class="result-card">
                     <h3><i class="fas fa-info-circle"></i> Speech Statistics</h3>
                     <div class="stats-grid">
                         <div class="stat-item">
-                            <span class="stat-label">Total Words</span>
+                            <span class="stat-label">Total Words:</span>
                             <span class="stat-value" id="totalWords">-</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">Unique Words</span>
+                            <span class="stat-label">Unique Words:</span>
                             <span class="stat-value" id="uniqueWords">-</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">Speech Duration</span>
-                            <span class="stat-value" id="speechDuration">-</span>
+                            <span class="stat-label">Average Word Length:</span>
+                            <span class="stat-value" id="avgWordLength">-</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">Avg Word Length</span>
-                            <span class="stat-value" id="avgWordLength">-</span>
+                            <span class="stat-label">Speech Duration:</span>
+                            <span class="stat-value" id="speechDuration">-</span>
                         </div>
                     </div>
                 </div>
@@ -229,7 +278,7 @@
         </main>
 
         <footer class="footer">
-            <p>&copy; 2026 AI Speech Analyzer &mdash; Powered by Whisper AI &amp; TextBlob</p>
+            <p>&copy; 2026 AI Speech Analyzer. Powered by Whisper AI and TextBlob.</p>
         </footer>
     </div>
 

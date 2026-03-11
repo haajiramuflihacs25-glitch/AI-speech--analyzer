@@ -51,6 +51,92 @@ except Exception as e:
 # Allowed file extensions (now includes video)
 ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', 'ogg', '3gp', 'aac', 'flac'}
 
+# Filler words list for detection
+FILLER_WORDS = [
+    "um", "uh", "like", "you know", "actually", "basically", "so", "well",
+    "yeah", "okay", "right", "I mean", "sort of", "kind of", "you see", 
+    "anyway", "obviously", "literally", "totally", "absolutely"
+]
+
+def detect_filler_words(text):
+    """Detect filler words in text and return analysis"""
+    import re
+    
+    # Convert to lowercase for case-insensitive matching
+    text_lower = text.lower()
+    words = text.split()
+    total_words = len(words)
+    
+    filler_instances = []
+    filler_count = 0
+    filler_stats = {}
+    
+    # Check for single word fillers
+    for i, word in enumerate(words):
+        clean_word = re.sub(r'[^\w\s]', '', word.lower())
+        if clean_word in FILLER_WORDS:
+            filler_instances.append({
+                'word': word,
+                'position': i,
+                'type': 'single'
+            })
+            filler_count += 1
+            filler_stats[clean_word] = filler_stats.get(clean_word, 0) + 1
+    
+    # Check for multi-word fillers
+    multi_word_fillers = ["you know", "I mean", "sort of", "kind of", "you see"]
+    for filler in multi_word_fillers:
+        filler_lower = filler.lower()
+        start = 0
+        while True:
+            pos = text_lower.find(filler_lower, start)
+            if pos == -1:
+                break
+            filler_instances.append({
+                'word': filler,
+                'position': pos,
+                'type': 'multi'
+            })
+            filler_count += 1
+            filler_stats[filler_lower] = filler_stats.get(filler_lower, 0) + 1
+            start = pos + len(filler)
+    
+    # Calculate statistics
+    percentage = (filler_count / total_words * 100) if total_words > 0 else 0
+    
+    return {
+        'instances': filler_instances,
+        'count': filler_count,
+        'percentage': round(percentage, 2),
+        'stats': filler_stats,
+        'total_words': total_words
+    }
+
+def highlight_filler_words(text):
+    """Highlight filler words in text with HTML spans"""
+    import re
+    
+    highlighted_text = text
+    
+    # Sort fillers by length (longest first) to avoid nested replacements
+    sorted_fillers = sorted(FILLER_WORDS, key=len, reverse=True)
+    
+    for filler in sorted_fillers:
+        # Create case-insensitive pattern with word boundaries
+        if " " in filler:
+            # Multi-word filler
+            pattern = r'\b' + re.escape(filler) + r'\b'
+        else:
+            # Single word filler
+            pattern = r'\b' + re.escape(filler) + r'\b'
+        
+        def replace_func(match):
+            return f'<span class="filler-word" data-filler="{filler.lower()}">{match.group()}</span>'
+        
+        highlighted_text = re.sub(pattern, replace_func, highlighted_text, flags=re.IGNORECASE)
+    
+    return highlighted_text
+
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -90,23 +176,36 @@ def extract_audio_from_video(video_path, output_audio_path):
         return False, f"Error extracting audio: {str(e)}"
 
 def validate_audio(filepath):
-    """Simple audio validation"""
+    """Enhanced audio validation with duration calculation"""
     try:
+        # Load audio with librosa for robust processing
         audio, sr = librosa.load(filepath, sr=16000)
         
         if len(audio) == 0:
-            return False, "Audio file is empty or corrupted", None
+            return False, "Audio file is empty or corrupted", None, 0
             
         if len(audio) < sr * 0.5:
-            return False, "Audio file is too short (minimum 0.5 seconds required)", None
+            return False, "Audio file is too short (minimum 0.5 seconds required)", None, 0
             
         if len(audio) > sr * 10 * 60:
-            return False, "Audio file is too long (maximum 10 minutes allowed)", None
+            return False, "Audio file is too long (maximum 10 minutes allowed)", None, 0
         
-        return True, f"Audio validated: {len(audio)/sr:.1f}s duration", audio
+        # Calculate duration using librosa (more accurate)
+        duration_seconds = librosa.get_duration(y=audio, sr=sr)
+        
+        return True, f"Audio validated: {duration_seconds:.1f}s duration", audio, duration_seconds
         
     except Exception as e:
-        return False, f"Error processing audio file: {str(e)}", None
+        return False, f"Error processing audio file: {str(e)}", None, 0
+
+def format_duration_simple(total_seconds):
+    """Simple duration formatting for MM:SS format"""
+    if total_seconds <= 0:
+        return "0:00"
+    
+    minutes = int(total_seconds // 60)
+    seconds = int(total_seconds % 60)
+    return f"{minutes}:{seconds:02d}"
 
 @app.route('/')
 def index():
@@ -158,7 +257,7 @@ def analyze_audio():
             
             # Validate audio file
             print(f"Processing audio file: {filename}")
-            is_valid, message, audio_data = validate_audio(audio_path)
+            is_valid, message, audio_data, librosa_duration = validate_audio(audio_path)
             
             if not is_valid:
                 return jsonify({'error': message}), 400
@@ -203,23 +302,52 @@ def analyze_audio():
             unique_words = len(set(words))
             avg_word_length = sum(len(word) for word in words) / len(words) if words else 0
             
-            # Get duration from Whisper result if available
-            duration = result.get("duration", 0)
-            duration_str = f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else "Unknown"
+            # Enhanced duration calculation - use both Whisper and librosa for accuracy
+            print("DEBUG: Getting duration from Whisper result...")
+            whisper_duration = result.get("duration", 0)
+            print(f"DEBUG: whisper_duration = {whisper_duration}")
+            print(f"DEBUG: librosa_duration = {librosa_duration}")
+            
+            # Use the more accurate duration source
+            final_duration = librosa_duration if librosa_duration > 0 else whisper_duration
+            print(f"DEBUG: final_duration = {final_duration}")
+            
+            print("DEBUG: Formatting duration...")
+            duration_formatted = format_duration_simple(final_duration)
+            print(f"DEBUG: duration_formatted = {duration_formatted}")
+            
+            print("DEBUG: Starting filler word analysis...")
+            # Filler word analysis
+            filler_analysis = detect_filler_words(text)
+            highlighted_text = highlight_filler_words(text)
+            print("DEBUG: Filler word analysis complete")
+            
+            print("DEBUG: Preparing response data...")
+            print(f"DEBUG: Variables check - final_duration={final_duration}, duration_formatted={duration_formatted}")
+            print(f"DEBUG: filler_analysis keys: {filler_analysis.keys() if filler_analysis else 'None'}")
             
             # Prepare response
             response_data = {
                 'transcription': text,
+                'highlighted_transcription': highlighted_text,
                 'sentiment': {
                     'polarity': polarity,
                     'sentiment': sentiment
                 },
                 'wordFrequency': word_frequency,
+                'fillerAnalysis': {
+                    'count': filler_analysis['count'],
+                    'percentage': filler_analysis['percentage'],
+                    'stats': filler_analysis['stats'],
+                    'instances': filler_analysis['instances'],
+                    'rate_per_minute': round((filler_analysis['count'] / (final_duration / 60)) if final_duration > 0 else 0, 1)
+                },
                 'statistics': {
                     'totalWords': total_words,
                     'uniqueWords': unique_words,
                     'averageWordLength': round(avg_word_length, 1),
-                    'duration': duration_str
+                    'duration': duration_formatted,
+                    'wordsPerSecond': round(total_words / final_duration if final_duration > 0 else 0, 2)
                 }
             }
             

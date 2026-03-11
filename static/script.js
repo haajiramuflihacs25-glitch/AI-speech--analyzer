@@ -202,8 +202,21 @@ function simulateProgress() {
 
 // Display analysis results
 function displayResults(results) {
-    // Display transcription
+    // Display plain transcription (no highlighting)
     document.getElementById('transcriptionText').textContent = results.transcription;
+    
+    // Display highlighted transcription in filler analysis section
+    const fillerHighlightEl = document.getElementById('fillerHighlightedText');
+    if (results.highlighted_transcription) {
+        fillerHighlightEl.innerHTML = results.highlighted_transcription;
+    } else {
+        fillerHighlightEl.textContent = results.transcription;
+    }
+    
+    // Display filler word analysis
+    if (results.fillerAnalysis) {
+        displayFillerAnalysis(results.fillerAnalysis);
+    }
     
     // Display sentiment analysis
     const polarityScore = document.getElementById('polarityScore');
@@ -216,8 +229,8 @@ function displayResults(results) {
     
     // Update sentiment bar
     const barWidth = Math.abs(results.sentiment.polarity) * 100;
-    const barColor = results.sentiment.polarity > 0 ? '#28a745' : 
-                     results.sentiment.polarity < 0 ? '#dc3545' : '#6c757d';
+    const barColor = results.sentiment.polarity > 0 ? '#002147' : 
+                     results.sentiment.polarity < 0 ? '#8b0000' : '#5a6577';
     
     sentimentBar.style.width = barWidth + '%';
     sentimentBar.style.backgroundColor = barColor;
@@ -237,6 +250,112 @@ function displayResults(results) {
     // Show floating AI icon and prepare initial insights
     showFloatingAIIcon(results);
 }
+
+// Display filler word analysis
+function displayFillerAnalysis(fillerAnalysis) {
+    // Update filler statistics
+    document.getElementById('fillerCount').textContent = fillerAnalysis.count;
+    document.getElementById('fillerPercentage').textContent = fillerAnalysis.percentage + '%';
+    document.getElementById('fillerRate').textContent = fillerAnalysis.rate_per_minute;
+    
+    // Update progress bar and level
+    updateFillerProgress(fillerAnalysis.percentage);
+    
+    // Display filler breakdown if there are fillers
+    if (fillerAnalysis.count > 0) {
+        displayFillerBreakdown(fillerAnalysis.stats);
+    }
+    
+    // Generate and display recommendations
+    displayFillerRecommendations(fillerAnalysis);
+}
+
+// Update filler progress bar and level
+function updateFillerProgress(percentage) {
+    const progressFill = document.getElementById('fillerProgressFill');
+    const levelElement = document.getElementById('fillerLevel');
+    
+    let level, levelClass;
+    
+    if (percentage <= 5) {
+        level = 'Excellent';
+        levelClass = 'excellent';
+    } else if (percentage <= 10) {
+        level = 'Good';
+        levelClass = 'good';
+    } else if (percentage <= 15) {
+        level = 'Needs Improvement';
+        levelClass = 'needs-improvement';
+    } else {
+        level = 'Poor';
+        levelClass = 'poor';
+    }
+    
+    // Update progress bar
+    progressFill.style.width = Math.min(percentage, 20) / 20 * 100 + '%';
+    progressFill.className = `filler-progress-fill ${levelClass}`;
+    
+    // Update level text
+    levelElement.textContent = level;
+    levelElement.className = `filler-level ${levelClass}`;
+}
+
+// Display filler word breakdown
+function displayFillerBreakdown(fillerStats) {
+    const wordsList = document.getElementById('fillerWordsList');
+    wordsList.innerHTML = '';
+    
+    // Convert stats to array and sort by count
+    const fillerArray = Object.entries(fillerStats).sort((a, b) => b[1] - a[1]);
+    
+    fillerArray.forEach(([word, count]) => {
+        const tag = document.createElement('div');
+        tag.className = 'filler-word-tag';
+        tag.innerHTML = `
+            ${word}
+            <span class="filler-word-count">${count}</span>
+        `;
+        wordsList.appendChild(tag);
+    });
+}
+
+// Display filler recommendations
+function displayFillerRecommendations(fillerAnalysis) {
+    const tipsContainer = document.getElementById('fillerTips');
+    const tips = [];
+    
+    if (fillerAnalysis.percentage <= 5) {
+        tips.push('🎉 Excellent speaking! Your filler word usage is very low.');
+        tips.push('💪 Keep up the great work with clear, confident speech.');
+    } else if (fillerAnalysis.percentage <= 10) {
+        tips.push('👍 Good job! Your filler word usage is reasonable.');
+        tips.push('🎯 Try to be more aware of occasional fillers to improve further.');
+    } else if (fillerAnalysis.percentage <= 15) {
+        tips.push('⚠️ You have a moderate amount of filler words.');
+        tips.push('🎯 Practice pausing instead of using fillers.');
+        tips.push('📝 Record yourself regularly to build awareness.');
+    } else {
+        tips.push('🚨 High filler word usage detected.');
+        tips.push('⏸️ Practice pausing for 1-2 seconds instead of using fillers.');
+        tips.push('🎤 Try speaking slower to give yourself time to think.');
+        tips.push('📖 Practice reading aloud to improve fluency.');
+    }
+    
+    // Add rate-specific tips
+    if (fillerAnalysis.rate_per_minute > 10) {
+        tips.push('⚡ You\'re using fillers very frequently. Focus on breathing and pacing.');
+    }
+    
+    tipsContainer.innerHTML = '';
+    tips.forEach(tip => {
+        const tipElement = document.createElement('div');
+        tipElement.className = 'filler-tip';
+        tipElement.textContent = tip;
+        tipsContainer.appendChild(tipElement);
+    });
+}
+
+
 
 // Method switching functions
 function switchMethod(method) {
@@ -749,8 +868,8 @@ function createWordFrequencyChart(wordFreq) {
                 datasets: [{
                     label: 'Frequency',
                     data: frequencies,
-                    backgroundColor: 'rgba(102, 126, 234, 0.8)',
-                    borderColor: 'rgba(102, 126, 234, 1)',
+                    backgroundColor: 'rgba(0, 33, 71, 0.8)',
+                    borderColor: 'rgba(0, 33, 71, 1)',
                     borderWidth: 1
                 }]
             },
@@ -799,7 +918,7 @@ function displaySimpleChart(words, frequencies) {
     const barWidth = (canvas.width - 60) / words.length;
     const maxBarHeight = canvas.height - 60;
     
-    ctx.fillStyle = '#667eea';
+    ctx.fillStyle = '#002147';
     ctx.font = '12px Arial';
     
     words.forEach((word, index) => {
@@ -823,7 +942,7 @@ function displaySimpleChart(words, frequencies) {
         ctx.textAlign = 'center';
         ctx.fillText(frequencies[index], x + barWidth/2, y - 5);
         
-        ctx.fillStyle = '#667eea';
+        ctx.fillStyle = '#002147';
     });
 }
 
@@ -847,8 +966,19 @@ function displayWordStats(wordFreq) {
 
 // Copy transcription to clipboard
 function copyTranscription() {
-    const transcriptionText = document.getElementById('transcriptionText').textContent;
-    navigator.clipboard.writeText(transcriptionText).then(() => {
+    const transcriptionElement = document.getElementById('transcriptionText');
+    
+    // Get the text content without HTML tags
+    let textToCopy;
+    if (transcriptionElement.innerHTML.includes('<span')) {
+        // If there are highlighted spans, get clean text content
+        textToCopy = transcriptionElement.textContent || transcriptionElement.innerText;
+    } else {
+        // If plain text, use it directly
+        textToCopy = transcriptionElement.textContent;
+    }
+    
+    navigator.clipboard.writeText(textToCopy).then(() => {
         showNotification('Transcription copied to clipboard!', 'success');
     }).catch(err => {
         console.error('Failed to copy text:', err);
@@ -922,7 +1052,7 @@ function showNotification(message, type = 'info') {
         position: fixed;
         top: 20px;
         right: 20px;
-        background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'};
+        background: ${type === 'success' ? '#002147' : type === 'error' ? '#8b0000' : '#0d3a6e'};
         color: white;
         padding: 15px 20px;
         border-radius: 5px;
