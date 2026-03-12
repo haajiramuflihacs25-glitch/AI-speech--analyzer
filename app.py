@@ -23,10 +23,23 @@ app = Flask(__name__,
 app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # 25MB max for Vercel
 app.config['UPLOAD_FOLDER'] = '/tmp/uploads' if os.environ.get('VERCEL') else 'uploads'
 
-# Groq API Configuration (free Whisper transcription + chat)
+# Groq API Configuration (free Whisper transcription + chat) 
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GROQ_CHAT_MODEL = os.getenv('GROQ_CHAT_MODEL', 'llama-3.3-70b-versatile')
-groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+
+# Deferred Groq client initialization to avoid import-time errors
+_groq_client = None
+
+def get_groq_client():
+    """Lazily initialize and return the Groq client"""
+    global _groq_client
+    if _groq_client is None and GROQ_API_KEY:
+        try:
+            _groq_client = Groq(api_key=GROQ_API_KEY)
+        except Exception as e:
+            print(f"Failed to initialize Groq client: {e}")
+            return None
+    return _groq_client
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -269,6 +282,7 @@ def analyze_audio():
         
         try:
             # Check if Groq API is configured
+            groq_client = get_groq_client()
             if groq_client is None:
                 return jsonify({'error': 'Groq API key not configured. Add GROQ_API_KEY to environment variables.'}), 500
             
@@ -558,6 +572,9 @@ Guidelines:
         
         # Make API request to Groq
         try:
+            groq_client = get_groq_client()
+            if not groq_client:
+                return jsonify({'error': 'Groq API not available'}), 500
             completion = groq_client.chat.completions.create(
                 model=GROQ_CHAT_MODEL,
                 messages=messages,
@@ -889,7 +906,7 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'groq_configured': groq_client is not None,
+        'groq_configured': get_groq_client() is not None,
         'version': '1.0.0'
     })
 
