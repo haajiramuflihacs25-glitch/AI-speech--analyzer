@@ -103,10 +103,10 @@ body {
 .upload-method {
     background: var(--off-white);
     border-radius: var(--radius-sm);
-    padding: 20px;
+    padding: 8px;
     border: 2px solid var(--border);
     transition: border-color var(--transition), background var(--transition);
-    min-height: 100px;
+    min-height: 45px;
 }
 
 .upload-method.active {
@@ -117,19 +117,19 @@ body {
 .method-header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 14px;
+    gap: 6px;
+    margin-bottom: 6px;
     color: var(--text);
 }
 
 .method-header i {
-    font-size: 1.3rem;
+    font-size: 1rem;
     color: var(--oxford);
 }
 
 .method-header h4 {
     margin: 0;
-    font-size: 1rem;
+    font-size: 0.85rem;
     font-weight: 600;
 }
 
@@ -141,7 +141,7 @@ body {
 }
 
 .toggle-btn {
-    padding: 8px 20px;
+    padding: 6px 16px;
     border: 2px solid var(--oxford);
     background: var(--white);
     color: var(--oxford);
@@ -152,7 +152,7 @@ body {
     align-items: center;
     gap: 6px;
     font-weight: 600;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
 }
 
 .toggle-btn.active {
@@ -167,11 +167,11 @@ body {
 .upload-area {
     border: 2px dashed var(--oxford);
     border-radius: var(--radius-sm);
-    padding: 20px;
+    padding: 8px;
     background: var(--white);
     cursor: pointer;
     text-align: center;
-    min-height: 60px;
+    min-height: 30px;
     transition: background var(--transition), border-color var(--transition);
 }
 
@@ -186,8 +186,8 @@ body {
 
 .upload-area p {
     color: var(--text-muted);
-    margin: 5px 0;
-    font-size: 0.9rem;
+    margin: 2px 0;
+    font-size: 0.8rem;
 }
 
 /* ===== RECORDING ===== */
@@ -204,9 +204,9 @@ body {
     transition: all var(--transition);
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 10px 20px;
-    font-size: 0.9rem;
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
     font-weight: 600;
 }
 
