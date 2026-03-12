@@ -284,12 +284,22 @@ function displaySpeechScore(scoreData) {
 
     // Color based on score
     let color;
-    if (target >= 90) color = '#10b981';
-    else if (target >= 75) color = '#3b82f6';
-    else if (target >= 60) color = '#f59e0b';
-    else color = '#ef4444';
+    let levelColor;
+    if (target >= 90) {
+        color = '#10b981';
+        levelColor = '#002147';
+    } else if (target >= 75) {
+        color = '#3b82f6';
+        levelColor = color;
+    } else if (target >= 60) {
+        color = '#f59e0b';
+        levelColor = color;
+    } else {
+        color = '#ef4444';
+        levelColor = color;
+    }
     scoreRing.style.stroke = color;
-    scoreLevel.style.color = color;
+    scoreLevel.style.color = levelColor;
 
     scoreLevel.textContent = scoreData.level;
     scoreFeedback.textContent = scoreData.feedback;
