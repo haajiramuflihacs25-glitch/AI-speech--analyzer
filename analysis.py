@@ -122,3 +122,61 @@ speech_duration = f"{minutes} min {seconds} sec"
 
 print("Speech Duration:", speech_duration)
 
+def calculate_speech_score(total_words, unique_words, filler_count, sentiment_polarity):
+    
+    score = 100
+
+    # reduce score for filler words
+    score -= filler_count * 3
+
+    # vocabulary richness
+    vocab_score = (unique_words / total_words) * 100
+
+    # sentiment bonus
+    if sentiment_polarity > 0:
+        score += 5
+
+    # clarity adjustment
+    if filler_count > 5:
+        score -= 5
+
+    # limit score
+    if score > 100:
+        score = 100
+    if score < 0:
+        score = 0
+
+    return round(score), round(vocab_score)
+speech_score, vocab_score = calculate_speech_score(
+    total_words,
+    unique_words,
+    filler_count,
+    sentiment_polarity
+)
+def speech_level(score):
+
+    if score >= 90:
+        return "Excellent Speaker"
+    elif score >= 75:
+        return "Confident Speaker"
+    elif score >= 60:
+        return "Developing Speaker"
+    else:
+        return "Needs Improvement"
+    def speech_feedback(score):
+
+    if score >= 90:
+        return "Outstanding speech with strong clarity and vocabulary."
+    
+    elif score >= 75:
+        return "Good speech. Reducing filler words will improve it further."
+    
+    elif score >= 60:
+        return "Speech is understandable but can improve clarity and confidence."
+    
+    else:
+        return "Try practicing more and reduce filler words for better communication."
+    
+    clarity_score = 100 - (filler_count * 5)
+confidence_score = 80 if sentiment_polarity > 0 else 60
+vocabulary_score = (unique_words / total_words) * 100

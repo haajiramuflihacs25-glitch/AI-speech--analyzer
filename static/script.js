@@ -218,6 +218,11 @@ function displayResults(results) {
         displayFillerAnalysis(results.fillerAnalysis);
     }
     
+    // Display speech score
+    if (results.speechScore) {
+        displaySpeechScore(results.speechScore);
+    }
+    
     // Display sentiment analysis
     const polarityScore = document.getElementById('polarityScore');
     const sentimentResult = document.getElementById('sentimentResult');
@@ -249,6 +254,57 @@ function displayResults(results) {
     
     // Show floating AI icon and prepare initial insights
     showFloatingAIIcon(results);
+}
+
+// Display speech score with animated circle
+function displaySpeechScore(scoreData) {
+    const scoreValue = document.getElementById('scoreValue');
+    const scoreLevel = document.getElementById('scoreLevel');
+    const scoreFeedback = document.getElementById('scoreFeedback');
+    const scoreRing = document.getElementById('scoreRing');
+
+    // Animate score number
+    let current = 0;
+    const target = scoreData.overall;
+    const increment = Math.ceil(target / 40);
+    const timer = setInterval(() => {
+        current = Math.min(current + increment, target);
+        scoreValue.textContent = current;
+        if (current >= target) clearInterval(timer);
+    }, 30);
+
+    // Animate ring (circumference = 2 * PI * 52 ≈ 326.7)
+    const circumference = 2 * Math.PI * 52;
+    scoreRing.style.strokeDasharray = circumference;
+    scoreRing.style.strokeDashoffset = circumference;
+    setTimeout(() => {
+        const offset = circumference - (target / 100) * circumference;
+        scoreRing.style.strokeDashoffset = offset;
+    }, 100);
+
+    // Color based on score
+    let color;
+    if (target >= 90) color = '#10b981';
+    else if (target >= 75) color = '#3b82f6';
+    else if (target >= 60) color = '#f59e0b';
+    else color = '#ef4444';
+    scoreRing.style.stroke = color;
+    scoreLevel.style.color = color;
+
+    scoreLevel.textContent = scoreData.level;
+    scoreFeedback.textContent = scoreData.feedback;
+
+    // Breakdown bars
+    animateBar('vocabBar', 'vocabValue', scoreData.vocabScore);
+    animateBar('clarityBar', 'clarityValue', scoreData.clarityScore);
+    animateBar('confidenceBar', 'confidenceValue', scoreData.confidenceScore);
+}
+
+function animateBar(barId, valueId, percent) {
+    const bar = document.getElementById(barId);
+    const val = document.getElementById(valueId);
+    val.textContent = percent + '%';
+    setTimeout(() => { bar.style.width = percent + '%'; }, 200);
 }
 
 // Display filler word analysis

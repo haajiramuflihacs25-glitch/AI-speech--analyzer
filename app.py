@@ -207,6 +207,45 @@ def format_duration_simple(total_seconds):
     seconds = int(total_seconds % 60)
     return f"{minutes}:{seconds:02d}"
 
+def calculate_speech_score(total_words, unique_words, filler_count, sentiment_polarity):
+    """Calculate speech score based on analysis metrics"""
+    score = 100
+    # Reduce score for filler words
+    score -= filler_count * 3
+    # Vocabulary richness
+    vocab_score = (unique_words / total_words) * 100 if total_words > 0 else 0
+    # Sentiment bonus
+    if sentiment_polarity > 0:
+        score += 5
+    # Clarity adjustment
+    if filler_count > 5:
+        score -= 5
+    # Limit score
+    score = max(0, min(100, score))
+    return round(score), round(vocab_score)
+
+def get_speech_level(score):
+    """Determine speaker level based on score"""
+    if score >= 90:
+        return "Excellent Speaker"
+    elif score >= 75:
+        return "Confident Speaker"
+    elif score >= 60:
+        return "Developing Speaker"
+    else:
+        return "Needs Improvement"
+
+def get_speech_feedback(score):
+    """Generate feedback based on speech score"""
+    if score >= 90:
+        return "Outstanding speech with strong clarity and vocabulary."
+    elif score >= 75:
+        return "Good speech. Reducing filler words will improve it further."
+    elif score >= 60:
+        return "Speech is understandable but can improve clarity and confidence."
+    else:
+        return "Try practicing more and reduce filler words for better communication."
+
 @app.route('/')
 def index():
     """Serve the main webpage"""
@@ -326,6 +365,13 @@ def analyze_audio():
             print(f"DEBUG: Variables check - final_duration={final_duration}, duration_formatted={duration_formatted}")
             print(f"DEBUG: filler_analysis keys: {filler_analysis.keys() if filler_analysis else 'None'}")
             
+            # Calculate speech score
+            speech_score, vocab_score = calculate_speech_score(
+                total_words, unique_words, filler_analysis['count'], polarity
+            )
+            clarity_score = max(0, 100 - (filler_analysis['count'] * 5))
+            confidence_score = 80 if polarity > 0 else 60
+            
             # Prepare response
             response_data = {
                 'transcription': text,
@@ -341,6 +387,14 @@ def analyze_audio():
                     'stats': filler_analysis['stats'],
                     'instances': filler_analysis['instances'],
                     'rate_per_minute': round((filler_analysis['count'] / (final_duration / 60)) if final_duration > 0 else 0, 1)
+                },
+                'speechScore': {
+                    'overall': speech_score,
+                    'level': get_speech_level(speech_score),
+                    'feedback': get_speech_feedback(speech_score),
+                    'vocabScore': vocab_score,
+                    'clarityScore': clarity_score,
+                    'confidenceScore': confidence_score
                 },
                 'statistics': {
                     'totalWords': total_words,

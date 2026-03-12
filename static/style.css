@@ -28,72 +28,6 @@ body {
     min-height: 100vh;
     color: var(--text);
     line-height: 1.6;
-    padding-top: 46px;
-}
-
-/* ===== NAVBAR ===== */
-.navbar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 900;
-    background: #001a38;
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-bottom: 1px solid var(--border);
-    transition: background var(--transition), box-shadow var(--transition);
-}
-
-.navbar:hover {
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 2px 16px rgba(0, 33, 71, 0.1);
-    
-}
-
-.navbar-inner {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 24px;
-    height: 46px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.navbar-brand {
-    font-size: 0.92rem;
-    font-weight: 700;
-    color: var(--white);
-    letter-spacing: 0.2px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.navbar-brand i {
-    font-size: 0.85rem;
-    opacity: 0.8;
-}
-
-.navbar-links {
-    display: flex;
-    gap: 6px;
-}
-
-.navbar-links a {
-    color: var(--white);
-    text-decoration: none;
-    font-size: 0.8rem;
-    font-weight: 600;
-    padding: 5px 14px;
-    border-radius: 100px;
-    transition: color var(--transition), background var(--transition);
-}
-
-.navbar-links a:hover {
-    color: var(--white);
-    background: rgba(0, 33, 71, 0.06);
 }
 
 /* ===== LAYOUT ===== */
@@ -1249,13 +1183,130 @@ body {
     opacity: 1;
 }
 
+/* ===== SPEECH SCORE ===== */
+.speech-score-card .score-container {
+    display: flex;
+    gap: 32px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.score-circle-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-width: 140px;
+}
+
+.score-circle {
+    position: relative;
+    width: 120px;
+    height: 120px;
+}
+
+.score-circle svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.score-bg {
+    fill: none;
+    stroke: #e5e7eb;
+    stroke-width: 8;
+}
+
+.score-ring {
+    fill: none;
+    stroke: #3b82f6;
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1.2s ease-out, stroke 0.4s ease;
+}
+
+.score-value {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1e293b;
+}
+
+.score-level {
+    font-size: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.score-details {
+    flex: 1;
+    min-width: 200px;
+}
+
+.score-feedback {
+    font-size: 0.95rem;
+    color: #475569;
+    margin-bottom: 18px;
+    line-height: 1.5;
+}
+
+.score-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.breakdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.breakdown-label {
+    font-size: 0.85rem;
+    color: #64748b;
+    min-width: 110px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.breakdown-label i {
+    color: #002147;
+    width: 14px;
+}
+
+.breakdown-bar-track {
+    flex: 1;
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.breakdown-bar-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #002147, #0047ab);
+    border-radius: 4px;
+    transition: width 1s ease-out;
+}
+
+.breakdown-value {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #1e293b;
+    min-width: 36px;
+    text-align: right;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
     .container { padding: 0 12px 30px; }
-
-    .navbar-inner { padding: 0 14px; height: 42px; }
-    .navbar-brand { font-size: 0.82rem; }
-    .navbar-links a { font-size: 0.72rem; padding: 4px 10px; }
 
     .header {
         padding: 40px 16px 32px;
@@ -1271,6 +1322,9 @@ body {
     .stats-grid { grid-template-columns: 1fr; }
 
     .filler-stats-grid { grid-template-columns: 1fr; }
+
+    .score-container { flex-direction: column; align-items: center; text-align: center; }
+    .breakdown-label { min-width: 90px; }
 
     .word-stats { grid-template-columns: 1fr; }
 
