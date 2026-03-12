@@ -1,5 +1,4 @@
 flask==3.0.0
-groq==0.4.2
 textblob==0.18.0
 werkzeug==3.0.1
 requests==2.31.0

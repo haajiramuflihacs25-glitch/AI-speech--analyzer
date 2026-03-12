@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
-from groq import Groq
 from textblob import TextBlob
 import tempfile
 import json
@@ -23,23 +22,39 @@ app = Flask(__name__,
 app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # 25MB max for Vercel
 app.config['UPLOAD_FOLDER'] = '/tmp/uploads' if os.environ.get('VERCEL') else 'uploads'
 
-# Groq API Configuration (free Whisper transcription + chat) 
+# Groq API Configuration (free Whisper transcription + chat)
+# Using raw HTTP requests instead of SDK to avoid httpx compatibility issues on Vercel
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GROQ_CHAT_MODEL = os.getenv('GROQ_CHAT_MODEL', 'llama-3.3-70b-versatile')
+GROQ_API_BASE = 'https://api.groq.com/openai/v1'
 
-# Deferred Groq client initialization to avoid import-time errors
-_groq_client = None
+def groq_transcribe(audio_path):
+    """Transcribe audio using Groq Whisper API via raw HTTP request"""
+    url = f'{GROQ_API_BASE}/audio/transcriptions'
+    headers = {'Authorization': f'Bearer {GROQ_API_KEY}'}
+    with open(audio_path, 'rb') as f:
+        files = {'file': (os.path.basename(audio_path), f)}
+        data = {'model': 'whisper-large-v3-turbo', 'response_format': 'verbose_json'}
+        resp = requests.post(url, headers=headers, files=files, data=data, timeout=120)
+    resp.raise_for_status()
+    return resp.json()
 
-def get_groq_client():
-    """Lazily initialize and return the Groq client"""
-    global _groq_client
-    if _groq_client is None and GROQ_API_KEY:
-        try:
-            _groq_client = Groq(api_key=GROQ_API_KEY)
-        except Exception as e:
-            print(f"Failed to initialize Groq client: {e}")
-            return None
-    return _groq_client
+def groq_chat(messages, max_tokens=300, temperature=0.7):
+    """Chat completion using Groq API via raw HTTP request"""
+    url = f'{GROQ_API_BASE}/chat/completions'
+    headers = {
+        'Authorization': f'Bearer {GROQ_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        'model': GROQ_CHAT_MODEL,
+        'messages': messages,
+        'max_tokens': max_tokens,
+        'temperature': temperature
+    }
+    resp = requests.post(url, headers=headers, json=payload, timeout=60)
+    resp.raise_for_status()
+    return resp.json()
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -282,8 +297,7 @@ def analyze_audio():
         
         try:
             # Check if Groq API is configured
-            groq_client = get_groq_client()
-            if groq_client is None:
+            if not GROQ_API_KEY:
                 return jsonify({'error': 'Groq API key not configured. Add GROQ_API_KEY to environment variables.'}), 500
             
             # Validate audio file
@@ -295,16 +309,11 @@ def analyze_audio():
             
             print(f"Audio validated: {message}")
             
-            # Transcribe using Groq Whisper API
-            with open(audio_path, 'rb') as audio_file:
-                transcription_result = groq_client.audio.transcriptions.create(
-                    file=(os.path.basename(audio_path), audio_file.read()),
-                    model="whisper-large-v3-turbo",
-                    response_format="verbose_json"
-                )
+            # Transcribe using Groq Whisper API (raw HTTP)
+            transcription_result = groq_transcribe(audio_path)
             
-            text = transcription_result.text.strip() if transcription_result.text else ""
-            groq_duration = getattr(transcription_result, 'duration', 0) or 0
+            text = (transcription_result.get('text') or '').strip()
+            groq_duration = transcription_result.get('duration', 0) or 0
             print(f"Transcription completed: '{text[:100]}...' ({len(text)} characters)")
             
             # Check if transcription is empty
@@ -570,20 +579,15 @@ Guidelines:
         # Add current message
         messages.append({"role": "user", "content": message})
         
-        # Make API request to Groq
+        # Make API request to Groq (raw HTTP)
         try:
-            groq_client = get_groq_client()
-            if not groq_client:
-                return jsonify({'error': 'Groq API not available'}), 500
-            completion = groq_client.chat.completions.create(
-                model=GROQ_CHAT_MODEL,
-                messages=messages,
-                max_tokens=300,
-                temperature=0.7
-            )
+            if not GROQ_API_KEY:
+                return generate_fallback_response(message, analysis_data)
+            result = groq_chat(messages, max_tokens=300, temperature=0.7)
             
-            if completion.choices and len(completion.choices) > 0:
-                ai_response = completion.choices[0].message.content
+            choices = result.get('choices', [])
+            if choices:
+                ai_response = choices[0].get('message', {}).get('content', '')
                 return ai_response
             else:
                 print("Groq API: No response choices available")
@@ -906,7 +910,7 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'groq_configured': get_groq_client() is not None,
+        'groq_configured': bool(GROQ_API_KEY),
         'version': '1.0.0'
     })
 
