@@ -147,14 +147,16 @@ def calculate_speech_score(total_words, unique_words, filler_count, sentiment_po
         score = 0
 
     return round(score), round(vocab_score)
-speech_score, vocab_score = calculate_speech_score(
-    total_words,
-    unique_words,
-    filler_count,
-    sentiment_polarity
-)
-def speech_level(score):
 
+# Example usage (commented out - variables need to be defined first)
+# speech_score, vocab_score = calculate_speech_score(
+#     total_words,
+#     unique_words,
+#     filler_count,
+#     sentiment_polarity
+# )
+
+def speech_level(score):
     if score >= 90:
         return "Excellent Speaker"
     elif score >= 75:
@@ -163,8 +165,8 @@ def speech_level(score):
         return "Developing Speaker"
     else:
         return "Needs Improvement"
-    def speech_feedback(score):
 
+def speech_feedback(score):
     if score >= 90:
         return "Outstanding speech with strong clarity and vocabulary."
     
@@ -176,7 +178,8 @@ def speech_level(score):
     
     else:
         return "Try practicing more and reduce filler words for better communication."
-    
-    clarity_score = 100 - (filler_count * 5)
-confidence_score = 80 if sentiment_polarity > 0 else 60
-vocabulary_score = (unique_words / total_words) * 100
+
+# Example usage (commented out - variables need to be defined first)
+# clarity_score = 100 - (filler_count * 5)
+# confidence_score = 80 if sentiment_polarity > 0 else 60
+# vocabulary_score = (unique_words / total_words) * 100

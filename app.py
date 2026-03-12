@@ -1,19 +1,24 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
-import whisper
+from groq import Groq
 from textblob import TextBlob
 import pandas as pd
 import tempfile
 import json
 from werkzeug.utils import secure_filename
 import traceback
-import librosa
-import numpy as np
 import warnings
-from scipy import signal
 import requests
 from dotenv import load_dotenv
 warnings.filterwarnings("ignore")
+
+# Try importing librosa (optional for duration)
+try:
+    import librosa
+    import numpy as np
+    LIBROSA_AVAILABLE = True
+except ImportError:
+    LIBROSA_AVAILABLE = False
 
 # Load environment variables
 load_dotenv()
@@ -23,30 +28,18 @@ app = Flask(__name__,
            template_folder='.')
 
 # Configuration
-app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200MB max file size for video
-app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # 25MB max for Vercel
+app.config['UPLOAD_FOLDER'] = '/tmp/uploads' if os.environ.get('VERCEL') else 'uploads'
 
-# OpenRouter AI Configuration
-OPENROUTER_API_KEY = os.getenv('OPEN_ROUTER_API_KEY')
-OPENROUTER_MODEL = os.getenv('OPEN_ROUTER_AI_MODEL', 'openai/gpt-3.5-turbo')
-OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1/chat/completions'
+# Groq API Configuration (free Whisper transcription + chat)
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+GROQ_CHAT_MODEL = os.getenv('GROQ_CHAT_MODEL', 'llama-3.3-70b-versatile')
+groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Load Whisper model (using tiny for better compatibility)
-print("Loading AI speech model...")
-try:
-    model = whisper.load_model("tiny")
-    print("Whisper 'tiny' model loaded successfully!")
-except Exception as e:
-    print(f"Failed to load tiny model: {e}")
-    try:
-        model = whisper.load_model("base")
-        print("Whisper 'base' model loaded successfully!")
-    except Exception as e2:
-        print(f"Failed to load base model: {e2}")
-        model = None
+print("AI Speech Analyzer ready (using Groq Whisper API for transcription)")
 
 # Allowed file extensions (now includes video)
 ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', 'ogg', '3gp', 'aac', 'flac'}
@@ -178,25 +171,24 @@ def extract_audio_from_video(video_path, output_audio_path):
 def validate_audio(filepath):
     """Enhanced audio validation with duration calculation"""
     try:
-        # Load audio with librosa for robust processing
-        audio, sr = librosa.load(filepath, sr=16000)
-        
-        if len(audio) == 0:
-            return False, "Audio file is empty or corrupted", None, 0
-            
-        if len(audio) < sr * 0.5:
-            return False, "Audio file is too short (minimum 0.5 seconds required)", None, 0
-            
-        if len(audio) > sr * 10 * 60:
-            return False, "Audio file is too long (maximum 10 minutes allowed)", None, 0
-        
-        # Calculate duration using librosa (more accurate)
-        duration_seconds = librosa.get_duration(y=audio, sr=sr)
-        
-        return True, f"Audio validated: {duration_seconds:.1f}s duration", audio, duration_seconds
-        
+        if LIBROSA_AVAILABLE:
+            audio, sr = librosa.load(filepath, sr=16000)
+            if len(audio) == 0:
+                return False, "Audio file is empty or corrupted", 0
+            if len(audio) < sr * 0.5:
+                return False, "Audio file is too short (minimum 0.5 seconds required)", 0
+            duration_seconds = librosa.get_duration(y=audio, sr=sr)
+            return True, f"Audio validated: {duration_seconds:.1f}s duration", duration_seconds
+        else:
+            # Basic validation without librosa
+            file_size = os.path.getsize(filepath)
+            if file_size == 0:
+                return False, "Audio file is empty", 0
+            # Estimate duration: ~16KB per second for wav at 16kHz mono
+            estimated_duration = file_size / 32000
+            return True, f"Audio validated (estimated {estimated_duration:.1f}s)", estimated_duration
     except Exception as e:
-        return False, f"Error processing audio file: {str(e)}", None, 0
+        return False, f"Error processing audio file: {str(e)}", 0
 
 def format_duration_simple(total_seconds):
     """Simple duration formatting for MM:SS format"""
@@ -290,27 +282,29 @@ def analyze_audio():
             print(f"Audio extraction successful: {message}")
         
         try:
-            # Check if model is loaded
-            if model is None:
-                return jsonify({'error': 'AI model failed to load. Please restart the server.'}), 500
+            # Check if Groq API is configured
+            if groq_client is None:
+                return jsonify({'error': 'Groq API key not configured. Add GROQ_API_KEY to environment variables.'}), 500
             
             # Validate audio file
             print(f"Processing audio file: {filename}")
-            is_valid, message, audio_data, librosa_duration = validate_audio(audio_path)
+            is_valid, message, librosa_duration = validate_audio(audio_path)
             
             if not is_valid:
                 return jsonify({'error': message}), 400
             
             print(f"Audio validated: {message}")
             
-            # Transcribe using Whisper
-            try:
-                result = model.transcribe(audio_path, fp16=False, verbose=False)
-            except Exception as e:
-                print(f"File transcription failed, trying audio array: {str(e)}")
-                result = model.transcribe(audio_data, fp16=False, verbose=False)
+            # Transcribe using Groq Whisper API
+            with open(audio_path, 'rb') as audio_file:
+                transcription_result = groq_client.audio.transcriptions.create(
+                    file=(os.path.basename(audio_path), audio_file.read()),
+                    model="whisper-large-v3-turbo",
+                    response_format="verbose_json"
+                )
             
-            text = result.get("text", "").strip()
+            text = transcription_result.text.strip() if transcription_result.text else ""
+            groq_duration = getattr(transcription_result, 'duration', 0) or 0
             print(f"Transcription completed: '{text[:100]}...' ({len(text)} characters)")
             
             # Check if transcription is empty
@@ -341,29 +335,13 @@ def analyze_audio():
             unique_words = len(set(words))
             avg_word_length = sum(len(word) for word in words) / len(words) if words else 0
             
-            # Enhanced duration calculation - use both Whisper and librosa for accuracy
-            print("DEBUG: Getting duration from Whisper result...")
-            whisper_duration = result.get("duration", 0)
-            print(f"DEBUG: whisper_duration = {whisper_duration}")
-            print(f"DEBUG: librosa_duration = {librosa_duration}")
-            
-            # Use the more accurate duration source
-            final_duration = librosa_duration if librosa_duration > 0 else whisper_duration
-            print(f"DEBUG: final_duration = {final_duration}")
-            
-            print("DEBUG: Formatting duration...")
+            # Use the best available duration
+            final_duration = librosa_duration if librosa_duration > 0 else groq_duration
             duration_formatted = format_duration_simple(final_duration)
-            print(f"DEBUG: duration_formatted = {duration_formatted}")
             
-            print("DEBUG: Starting filler word analysis...")
             # Filler word analysis
             filler_analysis = detect_filler_words(text)
             highlighted_text = highlight_filler_words(text)
-            print("DEBUG: Filler word analysis complete")
-            
-            print("DEBUG: Preparing response data...")
-            print(f"DEBUG: Variables check - final_duration={final_duration}, duration_formatted={duration_formatted}")
-            print(f"DEBUG: filler_analysis keys: {filler_analysis.keys() if filler_analysis else 'None'}")
             
             # Calculate speech score
             speech_score, vocab_score = calculate_speech_score(
@@ -454,6 +432,9 @@ def ai_chat():
 def generate_speech_analysis(analysis_data):
     """Generate initial speech analysis"""
     try:
+        if analysis_data is None:
+            analysis_data = {}
+            
         transcription = analysis_data.get('transcription', '')
         sentiment = analysis_data.get('sentiment', {})
         word_freq = analysis_data.get('wordFrequency', {})
@@ -527,19 +508,28 @@ def generate_AI_response(message, analysis_data, chat_history):
     """Generate AI response based on user message and context"""
     try:
         print(f"DEBUG: Processing user message: '{message}'")
-        # If OpenRouter API is available, use it
-        if OPENROUTER_API_KEY:
-            return generate_openrouter_response(message, analysis_data, chat_history)
+        print(f"DEBUG: Groq API key present: {bool(GROQ_API_KEY and GROQ_API_KEY.strip())}")
+        # If Groq API is available, use it
+        if GROQ_API_KEY and GROQ_API_KEY.strip():
+            return generate_groq_response(message, analysis_data, chat_history)
         else:
-            print("DEBUG: Using fallback response system")
+            print("DEBUG: No valid Groq API key - using fallback response system")
             return generate_fallback_response(message, analysis_data)
     except Exception as e:
         print(f"Error generating AI response: {e}")
         return generate_fallback_response(message, analysis_data)
 
-def generate_openrouter_response(message, analysis_data, chat_history):
-    """Generate response using OpenRouter API"""
+def generate_groq_response(message, analysis_data, chat_history):
+    """Generate response using Groq API"""
     try:
+        # Handle None analysis_data
+        if analysis_data is None:
+            analysis_data = {}
+        
+        # Handle None chat_history
+        if chat_history is None:
+            chat_history = []
+        
         # Prepare enhanced context that handles general questions
         transcription = analysis_data.get('transcription', '')
         has_speech_data = bool(transcription and transcription.strip())
@@ -579,41 +569,28 @@ Guidelines:
         # Add current message
         messages.append({"role": "user", "content": message})
         
-        # Make API request
-        headers = {
-            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'http://localhost:5000',
-            'X-Title': 'AI Speech Analyzer'
-        }
-        
-        payload = {
-            'model': OPENROUTER_MODEL,
-            'messages': messages,
-            'max_tokens': 300,
-            'temperature': 0.7
-        }
-        
-        response = requests.post(OPENROUTER_BASE_URL, headers=headers, json=payload, timeout=30)
-        
-        if response.status_code == 200:
-            try:
-                result = response.json()
-                if result and 'choices' in result and result['choices']:
-                    ai_response = result['choices'][0]['message']['content']
-                    return ai_response
-                else:
-                    print(f"OpenRouter API: Invalid response structure: {result}")
-                    return generate_fallback_response(message, analysis_data)
-            except (KeyError, IndexError, TypeError) as e:
-                print(f"OpenRouter API: Response parsing error: {e}")
+        # Make API request to Groq
+        try:
+            completion = groq_client.chat.completions.create(
+                model=GROQ_CHAT_MODEL,
+                messages=messages,
+                max_tokens=300,
+                temperature=0.7
+            )
+            
+            if completion.choices and len(completion.choices) > 0:
+                ai_response = completion.choices[0].message.content
+                return ai_response
+            else:
+                print("Groq API: No response choices available")
                 return generate_fallback_response(message, analysis_data)
-        else:
-            print(f"OpenRouter API error: {response.status_code} - {response.text}")
+                
+        except Exception as api_error:
+            print(f"Groq API request error: {api_error}")
             return generate_fallback_response(message, analysis_data)
             
     except Exception as e:
-        print(f"OpenRouter API error: {e}")
+        print(f"Groq API error: {e}")
         return generate_fallback_response(message, analysis_data)
 
 def generate_fallback_response(message, analysis_data):
@@ -621,9 +598,12 @@ def generate_fallback_response(message, analysis_data):
     message_lower = message.lower().strip()
     print(f"DEBUG: Fallback processing message: '{message_lower}'")
     
+    # Check if we're in fallback mode due to missing API key
+    api_status = " (Note: Configure Groq API key for enhanced AI responses)" if not (GROQ_API_KEY and GROQ_API_KEY.strip()) else ""
+    
     # Greeting responses
     if any(word in message_lower for word in ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening']):
-        return "Hello! 👋 I'm your AI speech analysis assistant. I can help you with speech analysis, communication tips, or answer any questions you have. What would you like to discuss today?"
+        return f"Hello! 👋 I'm your AI speech analysis assistant. I can help you with speech analysis, communication tips, or answer any questions you have. What would you like to discuss today?{api_status}"
     
     # PRIORITIZE: Speech improvement questions (must come before general speech analysis)
     elif any(combo in message_lower for combo in ['improve in my speech', 'improve my speech', 'speech improvement', 'suggestion which i want to improve', 'things i want to improve']):
@@ -922,13 +902,13 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'model_loaded': model is not None,
+        'groq_configured': groq_client is not None,
         'version': '1.0.0'
     })
 
 @app.errorhandler(413)
 def too_large(e):
-    return jsonify({'error': 'File too large. Maximum file size is 200MB.'}), 413
+    return jsonify({'error': 'File too large. Maximum file size is 25MB.'}), 413
 
 @app.errorhandler(404)
 def not_found(e):
