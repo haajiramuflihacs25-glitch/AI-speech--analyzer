@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 from groq import Groq
 from textblob import TextBlob
-import pandas as pd
 import tempfile
 import json
 from werkzeug.utils import secure_filename
@@ -10,15 +9,8 @@ import traceback
 import warnings
 import requests
 from dotenv import load_dotenv
+import time
 warnings.filterwarnings("ignore")
-
-# Try importing librosa (optional for duration)
-try:
-    import librosa
-    import numpy as np
-    LIBROSA_AVAILABLE = True
-except ImportError:
-    LIBROSA_AVAILABLE = False
 
 # Load environment variables
 load_dotenv()
@@ -169,24 +161,18 @@ def extract_audio_from_video(video_path, output_audio_path):
         return False, f"Error extracting audio: {str(e)}"
 
 def validate_audio(filepath):
-    """Enhanced audio validation with duration calculation"""
+    """Lightweight audio validation with estimated duration"""
     try:
-        if LIBROSA_AVAILABLE:
-            audio, sr = librosa.load(filepath, sr=16000)
-            if len(audio) == 0:
-                return False, "Audio file is empty or corrupted", 0
-            if len(audio) < sr * 0.5:
-                return False, "Audio file is too short (minimum 0.5 seconds required)", 0
-            duration_seconds = librosa.get_duration(y=audio, sr=sr)
-            return True, f"Audio validated: {duration_seconds:.1f}s duration", duration_seconds
-        else:
-            # Basic validation without librosa
-            file_size = os.path.getsize(filepath)
-            if file_size == 0:
-                return False, "Audio file is empty", 0
-            # Estimate duration: ~16KB per second for wav at 16kHz mono
-            estimated_duration = file_size / 32000
-            return True, f"Audio validated (estimated {estimated_duration:.1f}s)", estimated_duration
+        # Basic file size validation
+        file_size = os.path.getsize(filepath)
+        if file_size == 0:
+            return False, "Audio file is empty", 0
+        if file_size < 1000:  # Less than 1KB
+            return False, "Audio file is too small", 0
+            
+        # Estimate duration based on file size (~16KB per second for compressed audio)
+        estimated_duration = max(1, file_size / 16000)  # Minimum 1 second
+        return True, f"Audio validated (estimated {estimated_duration:.1f}s)", estimated_duration
     except Exception as e:
         return False, f"Error processing audio file: {str(e)}", 0
 
@@ -288,7 +274,7 @@ def analyze_audio():
             
             # Validate audio file
             print(f"Processing audio file: {filename}")
-            is_valid, message, librosa_duration = validate_audio(audio_path)
+            is_valid, message, estimated_duration = validate_audio(audio_path)
             
             if not is_valid:
                 return jsonify({'error': message}), 400
@@ -322,13 +308,14 @@ def analyze_audio():
             else:
                 sentiment = "Neutral"
             
-            # Word Frequency Analysis
+            # Word Frequency Analysis (without pandas)
             words = text.lower().split()
-            df = pd.DataFrame(words, columns=["word"])
-            word_count = df["word"].value_counts().head(10)
+            word_counts = {}
+            for word in words:
+                word_counts[word] = word_counts.get(word, 0) + 1
             
-            # Convert to dictionary for JSON response
-            word_frequency = word_count.to_dict()
+            # Get top 10 words
+            word_frequency = dict(sorted(word_counts.items(), key=lambda x: x[1], reverse=True)[:10])
             
             # Calculate statistics
             total_words = len(words)
@@ -336,7 +323,7 @@ def analyze_audio():
             avg_word_length = sum(len(word) for word in words) / len(words) if words else 0
             
             # Use the best available duration
-            final_duration = librosa_duration if librosa_duration > 0 else groq_duration
+            final_duration = estimated_duration if estimated_duration > 0 else groq_duration
             duration_formatted = format_duration_simple(final_duration)
             
             # Filler word analysis
