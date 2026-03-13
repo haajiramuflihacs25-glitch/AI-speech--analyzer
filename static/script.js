@@ -471,7 +471,15 @@ function startRecording() {
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
             recordedChunks = [];
-            mediaRecorder = new MediaRecorder(stream);
+            // Determine supported MIME types
+            let mimeType = 'audio/webm';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'audio/mp4';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'audio/wav';
+                }
+            }
+            mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
             
             mediaRecorder.ondataavailable = function(event) {
                 if (event.data.size > 0) {
@@ -480,7 +488,7 @@ function startRecording() {
             };
             
             mediaRecorder.onstop = function() {
-                recordedBlob = new Blob(recordedChunks, { type: 'audio/wav' });
+                recordedBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
                 const audioUrl = URL.createObjectURL(recordedBlob);
                 
                 const recordedAudio = document.getElementById('recordedAudio');
@@ -537,8 +545,15 @@ function updateRecordingTime() {
 
 function useRecording() {
     if (recordedBlob) {
+        // Determine file extension based on MIME type
+        let extension = 'webm';
+        if (recordedBlob.type.includes('mp4')) extension = 'mp4';
+        else if (recordedBlob.type.includes('wav')) extension = 'wav';
+        else if (recordedBlob.type.includes('ogg')) extension = 'ogg';
+        else if (recordedBlob.type.includes('mpeg')) extension = 'mp3';
+        
         // Create a File object from the blob
-        selectedFile = new File([recordedBlob], 'recording.wav', { type: 'audio/wav' });
+        selectedFile = new File([recordedBlob], `recording.${extension}`, { type: recordedBlob.type });
         
         // Hide recording preview
         document.getElementById('recordingPreview').style.display = 'none';
@@ -581,36 +596,60 @@ function setupAIComponents() {
     const sendBtn = document.getElementById('sendMessageBtn');
     const userInput = document.getElementById('userMessageInput');
     
-    // Show AI icon by default (always available for chat)
-    aiIcon.classList.remove('hidden');
+    // Debug logging
+    console.log('setupAIComponents called');
+    console.log('aiIcon found:', aiIcon);
+    console.log('aiPanel found:', aiPanel);
+    
+    // Ensure AI icon is visible (removed hidden class if present)
+    if (aiIcon && aiIcon.classList.contains('hidden')) {
+        aiIcon.classList.remove('hidden');
+        console.log('Removed hidden class from aiIcon');
+    }
     
     // AI icon click event
-    aiIcon.addEventListener('click', toggleAIPanel);
+    if (aiIcon) {
+        aiIcon.addEventListener('click', toggleAIPanel);
+    }
     
     // Close panel event
-    closePanelBtn.addEventListener('click', closeAIPanel);
+    if (closePanelBtn) {
+        closePanelBtn.addEventListener('click', closeAIPanel);
+    }
     
     // Send message events
-    sendBtn.addEventListener('click', sendAIMessage);
-    userInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendAIMessage();
-        }
-    });
+    if (sendBtn) {
+        sendBtn.addEventListener('click', sendAIMessage);
+    }
+    
+    if (userInput) {
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendAIMessage();
+            }
+        });
+    }
     
     // Close panel when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!aiPanel.contains(e.target) && !aiIcon.contains(e.target) && aiPanel.classList.contains('active')) {
-            closeAIPanel();
-        }
-    });
+    if (aiPanel) {
+        document.addEventListener('click', function(e) {
+            if (!aiPanel.contains(e.target) && !aiIcon.contains(e.target) && aiPanel.classList.contains('active')) {
+                closeAIPanel();
+            }
+        });
+    }
 }
 
 // Show analysis notification on floating AI icon
 function showFloatingAIIcon(analysisResults) {
     currentAnalysisResults = analysisResults;
     const aiIcon = document.getElementById('aiFloatingIcon');
+    
+    if (!aiIcon) {
+        console.error('Cannot show floating AI icon - element not found');
+        return;
+    }
     
     // Add blinking animation to indicate new analysis is ready
     aiIcon.classList.add('blinking');
@@ -1059,7 +1098,8 @@ function addToHistory(filename, results) {
         filename: filename,
         timestamp: new Date().toLocaleString(),
         sentiment: results.sentiment.sentiment,
-        wordCount: results.statistics.totalWords
+        wordCount: results.statistics.totalWords,
+        fullResults: results
     };
     
     analysisHistory.unshift(historyItem);
@@ -1077,43 +1117,128 @@ function loadHistory() {
     const saved = localStorage.getItem('speechAnalysisHistory');
     if (saved) {
         analysisHistory = JSON.parse(saved);
+        
+        // Remove old incomplete history items (without fullResults)
+        analysisHistory = analysisHistory.filter(item => {
+            // Keep items that have complete data
+            return item && item.fullResults && item.fullResults.transcription;
+        });
+        
+        // Save cleaned history back
+        if (analysisHistory.length > 0) {
+            saveHistory();
+        } else {
+            localStorage.removeItem('speechAnalysisHistory');
+        }
+    }
+}
+
+// Toggle history visibility
+function toggleHistory() {
+    const historyList = document.getElementById('historyList');
+    const btn = document.querySelector('.btn-view-history');
+    
+    if (historyList.style.display === 'none' || !historyList.style.display) {
+        // Show history
         displayHistory();
+        historyList.style.display = 'block';
+        btn.innerHTML = '<i class="fas fa-chevron-up"></i> View History';
+    } else {
+        // Hide history
+        historyList.style.display = 'none';
+        btn.innerHTML = '<i class="fas fa-chevron-down"></i> View History';
     }
 }
 
 // Display history
 function displayHistory() {
     const historyList = document.getElementById('historyList');
-    
+
     if (analysisHistory.length === 0) {
         historyList.innerHTML = '<p class="no-history">No analysis history yet. Upload and analyze your first audio file!</p>';
         return;
     }
-    
+
     historyList.innerHTML = analysisHistory.map(item => `
-        <div class="history-item">
-            <div>
+        <div class="history-item" onclick="loadHistoryItem(${item.id}, this)" title="Click to reload this analysis">
+            <div class="history-item-left">
                 <strong>${item.filename}</strong>
-                <br>
                 <small>${item.timestamp}</small>
             </div>
-            <div>
-                <span class="sentiment ${item.sentiment.toLowerCase()}">${item.sentiment}</span>
-                <br>
-                <small>${item.wordCount} words</small>
+            <div class="history-item-right">
+                <span class="sentiment ${(item.sentiment || 'neutral').toLowerCase()}">${item.sentiment || 'Neutral'}</span>
+                <small>${item.wordCount || 0} words</small>
             </div>
         </div>
     `).join('');
 }
 
+function getDisplayableResults(item) {
+    if (item && item.fullResults) {
+        return item.fullResults;
+    }
+
+    // Legacy fallback: reuse results from another entry with same filename
+    const fallback = analysisHistory.find(
+        h => h.filename === item.filename && h.id !== item.id && h.fullResults
+    );
+    
+    if (fallback && fallback.fullResults) {
+        return fallback.fullResults;
+    }
+    
+    // If no fullResults found, construct minimal results from available data
+    if (item) {
+        return {
+            transcription: '(Full transcription not available)',
+            sentiment: { sentiment: item.sentiment || 'Unknown', polarity: 0 },
+            wordFrequency: {},
+            fillerAnalysis: { count: 0, percentage: 0, stats: {}, instances: [], rate_per_minute: 0 },
+            speechScore: { overall: 0, level: 'Unknown', feedback: '', vocabScore: 0, clarityScore: 0, confidenceScore: 0 },
+            statistics: { totalWords: item.wordCount || 0, uniqueWords: 0, averageWordLength: 0, duration: 'Unknown', wordsPerSecond: 0 }
+        };
+    }
+
+    return null;
+}
+
+// Load and display a history item's full results
+function loadHistoryItem(id, element) {
+    const item = analysisHistory.find(h => h.id === id);
+    const displayableResults = item ? getDisplayableResults(item) : null;
+
+    if (!displayableResults) {
+        showNotification('Results not available for this entry', 'error');
+        return;
+    }
+
+    // Mark item as active
+    document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
+    if (element) {
+        element.classList.add('active');
+    }
+
+    // Display results in the same results section
+    displayResults(displayableResults);
+    hideLoading();
+    showResults();
+
+    document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
+    // Check if this is partial data (from legacy history)
+    if (!item.fullResults) {
+        showNotification(`Loaded: ${item.filename} (partial data - full transcription not available)`, 'info');
+    } else {
+        showNotification(`Loaded: ${item.filename}`, 'success');
+    }
+}
+
 // Show notification
 function showNotification(message, type = 'info') {
-    // Create notification element
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.textContent = message;
-    
-    // Style the notification
+
     notification.style.cssText = `
         position: fixed;
         top: 20px;
@@ -1126,10 +1251,9 @@ function showNotification(message, type = 'info') {
         z-index: 1000;
         animation: slideIn 0.3s ease;
     `;
-    
+
     document.body.appendChild(notification);
-    
-    // Remove after 3 seconds
+
     setTimeout(() => {
         notification.remove();
     }, 3000);

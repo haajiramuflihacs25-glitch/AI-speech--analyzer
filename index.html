@@ -253,8 +253,13 @@
 
             <!-- History Section -->
             <section class="history-section">
-                <h2><i class="fas fa-history"></i> Analysis History</h2>
-                <div class="history-list" id="historyList">
+                <div class="history-section-header">
+                    <h2><i class="fas fa-history"></i> Analysis History</h2>
+                    <button class="btn-view-history" onclick="toggleHistory()" title="View analysis history">
+                        <i class="fas fa-chevron-down"></i> View History
+                    </button>
+                </div>
+                <div class="history-list" id="historyList" style="display: none;">
                     <p class="no-history">No analysis history yet. Upload and analyze your first audio file!</p>
                 </div>
             </section>
@@ -266,7 +271,7 @@
     </div>
 
     <!-- Floating AI Assistant Icon -->
-    <div id="aiFloatingIcon" class="ai-floating-icon hidden">
+    <div id="aiFloatingIcon" class="ai-floating-icon" style="display: flex !important; opacity: 1 !important; visibility: visible !important; pointer-events: auto !important;">
         <i class="fas fa-robot"></i>
         <div class="ai-notification-dot"></div>
     </div>

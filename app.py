@@ -887,16 +887,10 @@ def get_ai_insights():
         word_frequency = data.get('wordFrequency', {})
         
         # Simple insights if no API key
-        if not OPENROUTER_API_KEY:
-            insights = [{
-                "title": "Basic Analysis",
-                "content": f"Your speech was {sentiment_data['sentiment'].lower()} in tone with {len(transcription.split())} words. Consider the clarity and pacing of your delivery."
-            }]
-        else:
-            insights = [{
-                "title": "AI Analysis",
-                "content": "AI insights feature is available. Add your OpenRouter API key to enable detailed analysis."
-            }]
+        insights = [{
+            "title": "Basic Analysis",
+            "content": f"Your speech was {sentiment_data['sentiment'].lower()} in tone with {len(transcription.split())} words. Consider the clarity and pacing of your delivery."
+        }]
         
         return jsonify({'insights': insights})
         
