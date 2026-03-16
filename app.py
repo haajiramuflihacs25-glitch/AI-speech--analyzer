@@ -62,13 +62,8 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 print("AI Speech Analyzer ready (using Groq Whisper API for transcription)")
 
 # Allowed file extensions
-# Note: Video files not supported on Vercel (serverless) - FFmpeg unavailable
-if os.environ.get('VERCEL'):
-    # On Vercel: audio files only
-    ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg'}
-else:
-    # Local: include video files
-    ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', 'ogg', '3gp', 'aac', 'flac'}
+# Video files not supported (FFmpeg unavailable on Vercel serverless)
+ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg'}
 
 # Filler words list for detection
 FILLER_WORDS = [
@@ -160,43 +155,11 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def is_video_file(filename):
-    """Check if file is a video file"""
-    video_extensions = {'mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', '3gp'}
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in video_extensions
+# Video file detection disabled (video uploads no longer supported)
 
-def extract_audio_from_video(video_path, output_audio_path):
-    """Extract audio from video file using ffmpeg-python or moviepy"""
-    # Check if on Vercel - not supported
-    if os.environ.get('VERCEL'):
-        return False, "Video uploads not supported on deployed version. Please use audio files (WAV, MP3, M4A) or use live recording."
-    
-    try:
-        import moviepy.editor as mp
-        video = mp.VideoFileClip(video_path)
-        audio = video.audio
-        audio.write_audiofile(output_audio_path, logger=None, verbose=False)
-        audio.close()
-        video.close()
-        return True, "Audio extracted successfully"
-    except ImportError:
-        # Fallback to ffmpeg if moviepy is not available
-        try:
-            import subprocess
-            command = [
-                'ffmpeg', '-i', video_path,
-                '-ab', '160k', '-ac', '2', '-ar', '16000',
-                '-vn', output_audio_path, '-y'
-            ]
-            result = subprocess.run(command, capture_output=True, text=True)
-            if result.returncode == 0:
-                return True, "Audio extracted successfully"
-            else:
-                return False, f"FFmpeg error: {result.stderr}"
-        except Exception as e:
-            return False, f"Audio extraction failed: {str(e)}"
-    except Exception as e:
-        return False, f"Error extracting audio: {str(e)}"
+# Video extraction disabled (FFmpeg not available on serverless platforms)
+# def extract_audio_from_video(video_path, output_audio_path):
+#     Removed - video uploads not supported
 
 def validate_audio(filepath):
     """Lightweight audio validation with estimated duration"""
@@ -286,24 +249,15 @@ def analyze_audio():
             return jsonify({'error': 'No file selected'}), 400
         
         if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type. Please upload an audio or video file.'}), 400
+            return jsonify({'error': 'Invalid file type. Supported formats: WAV, MP3, M4A, AAC, FLAC, OGG. (Live recording available as alternative)'}), 400
         
         # Save uploaded file temporarily
         filename = secure_filename(file.filename)
         temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(temp_path)
         
-        # If it's a video file, extract audio first
+        # Audio path is the uploaded file (no video extraction needed)
         audio_path = temp_path
-        if is_video_file(filename):
-            print(f"Video file detected: {filename}. Extracting audio...")
-            audio_filename = f"extracted_{filename.rsplit('.', 1)[0]}.wav"
-            audio_path = os.path.join(app.config['UPLOAD_FOLDER'], audio_filename)
-            
-            success, message = extract_audio_from_video(temp_path, audio_path)
-            if not success:
-                return jsonify({'error': f'Failed to extract audio from video: {message}'}), 400
-            print(f"Audio extraction successful: {message}")
         
         try:
             # Check if Groq API is configured

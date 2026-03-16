@@ -76,17 +76,15 @@ function handleDrop(event) {
     }
 }
 
-// Check if file is valid audio file (video files not supported on Vercel)
+// Check if file is valid audio file
 function isValidAudioFile(file) {
     const validTypes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/m4a', 'audio/aac', 'audio/ogg', 'audio/flac', 'audio/webm'];
     const validExtensions = ['.wav', '.mp3', '.m4a', '.aac', '.flac', '.ogg'];
-    const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.3gp'];
     
     const isAudioFile = validTypes.includes(file.type) || validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-    const isVideoFile = videoExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
     
-    if (isVideoFile) {
-        showNotification('⚠️ Video uploads are not supported on the live deployed version. Please use audio files (WAV, MP3, M4A) or try live recording instead.', 'error');
+    if (!isAudioFile) {
+        showNotification('⚠️ Supported formats: WAV, MP3, M4A, AAC, FLAC, OGG. Or try live recording instead.', 'error');
         return false;
     }
     
