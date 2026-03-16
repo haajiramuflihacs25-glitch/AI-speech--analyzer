@@ -61,8 +61,14 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 print("AI Speech Analyzer ready (using Groq Whisper API for transcription)")
 
-# Allowed file extensions (now includes video)
-ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', 'ogg', '3gp', 'aac', 'flac'}
+# Allowed file extensions
+# Note: Video files not supported on Vercel (serverless) - FFmpeg unavailable
+if os.environ.get('VERCEL'):
+    # On Vercel: audio files only
+    ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg'}
+else:
+    # Local: include video files
+    ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', 'ogg', '3gp', 'aac', 'flac'}
 
 # Filler words list for detection
 FILLER_WORDS = [
@@ -161,6 +167,10 @@ def is_video_file(filename):
 
 def extract_audio_from_video(video_path, output_audio_path):
     """Extract audio from video file using ffmpeg-python or moviepy"""
+    # Check if on Vercel - not supported
+    if os.environ.get('VERCEL'):
+        return False, "Video uploads not supported on deployed version. Please use audio files (WAV, MP3, M4A) or use live recording."
+    
     try:
         import moviepy.editor as mp
         video = mp.VideoFileClip(video_path)

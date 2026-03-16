@@ -76,13 +76,21 @@ function handleDrop(event) {
     }
 }
 
-// Check if file is valid audio/video file
+// Check if file is valid audio file (video files not supported on Vercel)
 function isValidAudioFile(file) {
-    const validTypes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/m4a', 'audio/aac', 'audio/ogg', 'audio/flac', 'audio/webm',
-                       'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska', 'video/x-ms-wmv', 'video/webm', 'video/3gpp'];
-    const validExtensions = ['.wav', '.mp3', '.m4a', '.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.ogg', '.3gp', '.aac', '.flac'];
+    const validTypes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/m4a', 'audio/aac', 'audio/ogg', 'audio/flac', 'audio/webm'];
+    const validExtensions = ['.wav', '.mp3', '.m4a', '.aac', '.flac', '.ogg'];
+    const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.3gp'];
     
-    return validTypes.includes(file.type) || validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    const isAudioFile = validTypes.includes(file.type) || validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    const isVideoFile = videoExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    
+    if (isVideoFile) {
+        showNotification('⚠️ Video uploads are not supported on the live deployed version. Please use audio files (WAV, MP3, M4A) or try live recording instead.', 'error');
+        return false;
+    }
+    
+    return isAudioFile;
 }
 
 // Display file information
