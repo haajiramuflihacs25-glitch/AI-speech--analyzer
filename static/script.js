@@ -78,13 +78,13 @@ function handleDrop(event) {
 
 // Check if file is valid audio file
 function isValidAudioFile(file) {
-    const validTypes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/m4a', 'audio/aac', 'audio/ogg', 'audio/flac', 'audio/webm'];
-    const validExtensions = ['.wav', '.mp3', '.m4a', '.aac', '.flac', '.ogg'];
+    const validTypes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/m4a', 'audio/aac', 'audio/ogg', 'audio/flac', 'audio/webm', 'audio/mp4', 'audio/x-m4a'];
+    const validExtensions = ['.wav', '.mp3', '.m4a', '.aac', '.flac', '.ogg', '.webm', '.mp4'];
     
     const isAudioFile = validTypes.includes(file.type) || validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
     
     if (!isAudioFile) {
-        showNotification('⚠️ Supported formats: WAV, MP3, M4A, AAC, FLAC, OGG. Or try live recording instead.', 'error');
+        showNotification('⚠️ Supported formats: WAV, MP3, M4A, AAC, FLAC, OGG, WebM, MP4. Or try live recording instead.', 'error');
         return false;
     }
     
@@ -477,15 +477,26 @@ function startRecording() {
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
             recordedChunks = [];
-            // Determine supported MIME types
+            
+            // Determine supported MIME types - prioritize webm for better quality
             let mimeType = 'audio/webm';
             if (!MediaRecorder.isTypeSupported(mimeType)) {
-                mimeType = 'audio/mp4';
+                mimeType = 'audio/webm;codecs=opus';
                 if (!MediaRecorder.isTypeSupported(mimeType)) {
-                    mimeType = 'audio/wav';
+                    mimeType = 'audio/mp4';
+                    if (!MediaRecorder.isTypeSupported(mimeType)) {
+                        mimeType = 'audio/wav';
+                        if (!MediaRecorder.isTypeSupported(mimeType)) {
+                            mimeType = '';  // Let browser choose default
+                        }
+                    }
                 }
             }
-            mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+            
+            const recorderOptions = mimeType ? { mimeType: mimeType } : {};
+            mediaRecorder = new MediaRecorder(stream, recorderOptions);
+            
+            console.log('Recording with MIME type:', mediaRecorder.mimeType);
             
             mediaRecorder.ondataavailable = function(event) {
                 if (event.data.size > 0) {
@@ -494,7 +505,8 @@ function startRecording() {
             };
             
             mediaRecorder.onstop = function() {
-                recordedBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+                const finalMimeType = mediaRecorder.mimeType || 'audio/webm';
+                recordedBlob = new Blob(recordedChunks, { type: finalMimeType });
                 const audioUrl = URL.createObjectURL(recordedBlob);
                 
                 const recordedAudio = document.getElementById('recordedAudio');
@@ -551,15 +563,29 @@ function updateRecordingTime() {
 
 function useRecording() {
     if (recordedBlob) {
+        // For WebM and MP4 recordings, we'll send them as-is since backend now supports them
+        // If you need WAV conversion, uncomment the conversion logic below
+        
         // Determine file extension based on MIME type
         let extension = 'webm';
-        if (recordedBlob.type.includes('mp4')) extension = 'mp4';
-        else if (recordedBlob.type.includes('wav')) extension = 'wav';
-        else if (recordedBlob.type.includes('ogg')) extension = 'ogg';
-        else if (recordedBlob.type.includes('mpeg')) extension = 'mp3';
+        let mimeType = recordedBlob.type;
         
-        // Create a File object from the blob
-        selectedFile = new File([recordedBlob], `recording.${extension}`, { type: recordedBlob.type });
+        if (recordedBlob.type.includes('mp4')) {
+            extension = 'mp4';
+        } else if (recordedBlob.type.includes('wav')) {
+            extension = 'wav';
+        } else if (recordedBlob.type.includes('ogg')) {
+            extension = 'ogg';
+        } else if (recordedBlob.type.includes('mpeg')) {
+            extension = 'mp3';
+        } else if (!recordedBlob.type.includes('webm')) {
+            // Fallback to webm if MIME type is not recognized
+            mimeType = 'audio/webm';
+            extension = 'webm';
+        }
+        
+        // Create a File object from the blob with proper MIME type
+        selectedFile = new File([recordedBlob], `recording.${extension}`, { type: mimeType });
         
         // Hide recording preview
         document.getElementById('recordingPreview').style.display = 'none';
@@ -571,7 +597,7 @@ function useRecording() {
         // Switch to upload tab to show the file info
         switchMethod('upload');
         
-        showNotification('Recording ready for analysis!', 'success');
+        showNotification('Recording ready for analysis! Format: ' + extension.toUpperCase(), 'success');
     }
 }
 

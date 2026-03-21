@@ -63,7 +63,8 @@ print("AI Speech Analyzer ready (using Groq Whisper API for transcription)")
 
 # Allowed file extensions
 # Video files not supported (FFmpeg unavailable on Vercel serverless)
-ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg'}
+# Includes webm and mp4 for browser-based recordings
+ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg', 'webm', 'mp4'}
 
 # Filler words list for detection
 FILLER_WORDS = [
@@ -248,8 +249,13 @@ def analyze_audio():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
         
+        # Debug logging
+        file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'unknown'
+        print(f"DEBUG - File upload: {file.filename}, Extension: {file_ext}, Allowed: {allowed_file(file.filename)}")
+        
         if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type. Supported formats: WAV, MP3, M4A, AAC, FLAC, OGG. (Live recording available as alternative)'}), 400
+            print(f"DEBUG - Extension '{file_ext}' not in ALLOWED_EXTENSIONS: {ALLOWED_EXTENSIONS}")
+            return jsonify({'error': 'Invalid file type. Supported formats: WAV, MP3, M4A, AAC, FLAC, OGG, WebM, MP4. (Live recording available as alternative)'}), 400
         
         # Save uploaded file temporarily
         filename = secure_filename(file.filename)
